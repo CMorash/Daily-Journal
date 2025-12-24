@@ -11,6 +11,16 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Database configuration
+USE_POSTGRES = os.environ.get('USE_POSTGRES', 'false').lower() == 'true'
+
+if USE_POSTGRES:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL must be set when USE_POSTGRES=true")
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'change-this-secret-key-in-production')
 
@@ -26,35 +36,70 @@ USER_KEY_2 = os.environ.get('USER_KEY_2', 'change-me-key-2')
 # PDF export password
 PDF_PASSWORD = os.environ.get('PDF_PASSWORD', 'change-me-pdf-password')
 
-# User display names for PDF
+# User display names for PDF (from environment variables)
 USER_NAMES = {
-    'user1': 'Cale',
-    'user2': 'Carolyn'
+    'user1': os.environ.get('USER1', 'User 1'),
+    'user2': os.environ.get('USER2', 'User 2')
 }
 
-DATABASE = 'entries.db'
+SQLITE_DATABASE = 'entries.db'
 
 
 def get_db():
-    """Get database connection"""
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Get database connection (PostgreSQL or SQLite based on configuration)"""
+    if USE_POSTGRES:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        return conn
+    else:
+        conn = sqlite3.connect(SQLITE_DATABASE)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+
+def execute_query(conn, query, params=None):
+    """Execute a query with proper placeholder handling for each database type"""
+    if USE_POSTGRES:
+        # PostgreSQL uses %s placeholders
+        pg_query = query.replace('?', '%s')
+        cursor = conn.cursor()
+        cursor.execute(pg_query, params or ())
+        return cursor
+    else:
+        # SQLite uses ? placeholders
+        return conn.execute(query, params or ())
 
 
 def init_db():
     """Initialize the database with required tables"""
     conn = get_db()
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS entries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            text TEXT NOT NULL,
-            user_key TEXT NOT NULL,
-            entry_date DATETIME NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
+    
+    if USE_POSTGRES:
+        # PostgreSQL syntax
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS entries (
+                id SERIAL PRIMARY KEY,
+                text TEXT NOT NULL,
+                user_key TEXT NOT NULL,
+                entry_date TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        cursor.close()
+    else:
+        # SQLite syntax
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                text TEXT NOT NULL,
+                user_key TEXT NOT NULL,
+                entry_date DATETIME NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+    
     conn.close()
 
 
@@ -101,7 +146,8 @@ def submit_entry():
     # Store entry
     try:
         conn = get_db()
-        conn.execute(
+        execute_query(
+            conn,
             'INSERT INTO entries (text, user_key, entry_date) VALUES (?, ?, ?)',
             (text, user, datetime.now().isoformat())
         )
@@ -158,15 +204,19 @@ def generate_pdf(year=None):
             # entry_date is stored as ISO format: YYYY-MM-DDTHH:MM:SS.ffffff
             year_start = f'{year}-01-01T00:00:00'
             year_end = f'{year}-12-31T23:59:59.999999'
-            entries = conn.execute(
+            cursor = execute_query(
+                conn,
                 'SELECT * FROM entries WHERE entry_date >= ? AND entry_date <= ? ORDER BY entry_date ASC',
                 (year_start, year_end)
-            ).fetchall()
+            )
+            entries = cursor.fetchall()
         else:
             # Get all entries (fallback)
-            entries = conn.execute(
+            cursor = execute_query(
+                conn,
                 'SELECT * FROM entries ORDER BY entry_date ASC'
-            ).fetchall()
+            )
+            entries = cursor.fetchall()
         
         conn.close()
         
@@ -230,8 +280,13 @@ def generate_pdf(year=None):
         user1_count = sum(1 for e in entries if e['user_key'] == 'user1')
         user2_count = sum(1 for e in entries if e['user_key'] == 'user2')
         
-        # Get date range
-        dates = [datetime.fromisoformat(e['entry_date']) for e in entries]
+        # Get date range (handle both PostgreSQL datetime objects and SQLite ISO strings)
+        def parse_entry_date(entry_date):
+            if isinstance(entry_date, datetime):
+                return entry_date
+            return datetime.fromisoformat(entry_date)
+        
+        dates = [parse_entry_date(e['entry_date']) for e in entries]
         if dates:
             first_date = min(dates).strftime('%B %d, %Y')
             last_date = max(dates).strftime('%B %d, %Y')
@@ -302,7 +357,7 @@ def generate_pdf(year=None):
                 pdf.drawString(text_x, text_y - (i * 12), line)
             
             # Add date and author name at bottom
-            entry_date = datetime.fromisoformat(entry['entry_date'])
+            entry_date = parse_entry_date(entry['entry_date'])
             date_str = entry_date.strftime('%m/%d/%Y')
             author_name = USER_NAMES.get(entry['user_key'], entry['user_key'])
             

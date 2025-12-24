@@ -1,192 +1,164 @@
 # Daily Ideas Archive
 
-A simple web application for recording daily ideas (single sentences) that are archived and hidden until export. Entries can be exported to PDF for printing on business cards.
+A simple app for you and someone special to jot down daily ideas together. Each entry stays hidden until you export them as a printable PDF of business cards—perfect for a jar of memories or a creative keepsake.
 
-## Features
+## What It Does
 
-- ✅ Simple entry form with security key authentication
-- ✅ Two authorized users (you and your significant other)
-- ✅ Entries completely hidden from UI (database access OK)
-- ✅ PDF export with business card format (3.5" x 2")
-- ✅ Summary page with statistics
-- ✅ Character limit: 250 characters per entry
-- ✅ Responsive design for mobile and desktop
+- Write short daily ideas (up to 250 characters)
+- Two people can use it with separate security keys
+- Entries stay hidden from the UI (no peeking!)
+- Export everything to a PDF formatted as business cards (3.5" x 2")
+- Summary page shows stats: total entries, date range, who wrote what
 
-## Technology Stack
+## Tech Stack
 
 - **Backend**: Python Flask
-- **Database**: SQLite
+- **Database**: PostgreSQL (Neon) for production, SQLite for local dev
 - **PDF Generation**: ReportLab
-- **Frontend**: HTML/CSS/JavaScript
+- **Hosting**: Vercel (serverless)
 
-## Setup
+---
+
+## Local Development
+
+Want to run this on your own machine? Here's how.
 
 ### Prerequisites
 
-- Python 3.8 or higher
-- pip (Python package manager)
+- Python 3.8+
+- pip
 
-### Installation
+### Setup
 
-1. Clone or download this repository
+1. Clone the repo and cd into it:
 
-2. Create a virtual environment (recommended):
 ```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+git clone https://github.com/yourusername/daily-journal.git
+cd daily-journal/Daily-Journal
+```
+
+2. Create a virtual environment:
+
+```bash
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 ```
 
 3. Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Set up environment variables:
-```bash
-cp env.example .env
+4. Create a `.env` file with your secrets:
+
+```env
+USER_KEY_1=your-secret-key
+USER_KEY_2=partner-secret-key
+PDF_PASSWORD=export-password
+SECRET_KEY=flask-secret-key
+USER1=YourName
+USER2=PartnerName
 ```
 
-Edit `.env` and set your security keys:
-```
-USER_KEY_1=your-personal-key-here
-USER_KEY_2=significant-other-key-here
-PDF_PASSWORD=your-pdf-export-password-here
-SECRET_KEY=your-secret-key-here
-```
+5. Run it:
 
-5. Run the application:
 ```bash
 python app.py
 ```
 
-The app will be available at `http://localhost:5000`
+Open http://localhost:5000 and you're good to go. The app uses SQLite by default, so no database setup needed.
+
+---
+
+## Deploying to Vercel + Neon
+
+### Step 1: Set Up Neon Database
+
+1. Go to [neon.tech](https://neon.tech) and create a free account
+2. Create a new project
+3. Copy your connection string—it looks like:
+   ```
+   postgresql://username:password@ep-something.region.aws.neon.tech/dbname?sslmode=require
+   ```
+
+### Step 2: Deploy to Vercel
+
+1. Push this repo to GitHub
+2. Go to [vercel.com](https://vercel.com) and import your repository
+3. In the project settings, add these environment variables:
+
+| Variable | Value |
+|----------|-------|
+| `USE_POSTGRES` | `true` |
+| `DATABASE_URL` | Your Neon connection string |
+| `USER_KEY_1` | Your entry key |
+| `USER_KEY_2` | Partner's entry key |
+| `PDF_PASSWORD` | Password for PDF exports |
+| `SECRET_KEY` | Random secret (generate one) |
+| `USER1` | Your display name |
+| `USER2` | Partner's display name |
+
+4. Deploy! Vercel will build and host your app automatically.
+
+### Step 3: Initialize the Database
+
+The database table gets created automatically on first request. Just visit your deployed URL and you're set.
+
+---
+
+## Environment Variables Reference
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `USE_POSTGRES` | No | Set to `true` for PostgreSQL. Omit for SQLite. |
+| `DATABASE_URL` | If Postgres | Neon connection string |
+| `USER_KEY_1` | Yes | Security key for user 1 |
+| `USER_KEY_2` | Yes | Security key for user 2 |
+| `USER1` | No | Display name for user 1 (default: "User 1") |
+| `USER2` | No | Display name for user 2 (default: "User 2") |
+| `PDF_PASSWORD` | Yes | Password to export PDFs |
+| `SECRET_KEY` | Yes | Flask secret key for sessions |
+| `PORT` | No | Server port (default: 5000) |
+
+---
 
 ## Usage
 
-1. **Record an Entry**:
-   - Enter your security key
-   - Write your daily idea (max 250 characters)
-   - Click "Record Entry"
+### Recording an Entry
 
-2. **Export to PDF**:
-   - Click "Export to PDF" button
-   - Enter the PDF export password (separate from entry keys)
-   - PDF will download with:
-     - Summary page (total entries, date range, author stats)
-     - Business cards (one per entry) with text, date, and author name (Cale or Carolyn)
+1. Enter your security key
+2. Write your idea (keep it under 250 characters)
+3. Hit "Record Entry"
 
-## Database
+That's it. Your idea is saved and hidden away.
 
-The SQLite database (`entries.db`) stores:
-- Entry text
-- User key identifier (user1/user2)
-- Entry date
-- Created timestamp
+### Exporting to PDF
 
-You can access the database directly using SQLite tools to view entries:
-```bash
-sqlite3 entries.db
-SELECT * FROM entries;
-```
+1. Click "Export to PDF"
+2. Enter the PDF password
+3. Select a year
+4. Download your printable business cards
 
-## Deployment to Render (Free Hosting)
+The PDF includes a summary page with stats, followed by pages of business-card-sized entries you can cut out.
 
-### Step 1: Push to GitHub
-
-1. Create a new repository on GitHub
-2. Push this code to GitHub:
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/yourusername/your-repo.git
-git push -u origin main
-```
-
-### Step 2: Deploy on Render
-
-1. Go to [render.com](https://render.com) and sign up (free)
-2. Click "New +" → "Web Service"
-3. Connect your GitHub repository
-4. Configure:
-   - **Name**: daily-ideas-archive (or your choice)
-   - **Environment**: Python 3
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `python app.py`
-5. Add Environment Variables:
-   - `USER_KEY_1`: Your personal key (for entry submission)
-   - `USER_KEY_2`: Your significant other's key (for entry submission)
-   - `PDF_PASSWORD`: Password required to export PDFs
-   - `SECRET_KEY`: A random secret key (generate one)
-   - `PORT`: 10000 (Render's default)
-6. Click "Create Web Service"
-7. Wait for deployment (first deploy takes a few minutes)
-
-### Step 3: Access Your App
-
-Once deployed, Render will provide a URL like:
-`https://daily-ideas-archive.onrender.com`
-
-**Note**: Free tier on Render spins down after 15 minutes of inactivity. First request after spin-down may take 30-60 seconds to wake up.
-
-## Alternative Free Hosting Options
-
-### Railway
-- Similar to Render
-- $5 free credit monthly
-- Requires credit card (but free tier available)
-
-### PythonAnywhere
-- Free tier available
-- Flask-friendly
-- URL includes "pythonanywhere.com" domain
-
-### Fly.io
-- Free tier with generous limits
-- Good for Python apps
-- Slightly more complex setup
-
-## Security Notes
-
-- **Change default keys**: Always set your own `USER_KEY_1` and `USER_KEY_2`
-- **Change SECRET_KEY**: Use a strong random secret key in production
-- **Database**: The SQLite database file contains all entries. Keep it secure.
-- **HTTPS**: Free hosting providers (like Render) provide HTTPS automatically
-
-## PDF Format
-
-- **Card Size**: 3.5" x 2" (US standard business card)
-- **Per Card**: Entry text, date, author name (Cale or Carolyn)
-- **Layout**: Multiple cards per page (2 per row, 5 per column), evenly spaced
-- **Summary**: First page includes statistics (total entries, entries per author, date range)
-- **Security**: Password required to generate PDF (separate from entry submission keys)
+---
 
 ## Troubleshooting
 
-### Database Issues
-If you need to reset the database:
+**Database reset (local SQLite):**
 ```bash
 rm entries.db
-python app.py  # Will recreate the database
+python app.py
 ```
 
-### Port Already in Use
-Change the port in `.env` or set environment variable:
+**Port conflict:**
 ```bash
 PORT=5001 python app.py
 ```
 
-### PDF Generation Errors
-Ensure ReportLab is installed:
-```bash
-pip install reportlab
-```
-
-## License
-
-This project is for personal use. Feel free to modify as needed.
-
-## Support
-
-For issues or questions, check the database directly or review the code in `app.py`.
+**Vercel deployment issues:**
+- Double-check your environment variables
+- Make sure `USE_POSTGRES=true` is set
+- Verify your Neon connection string includes `?sslmode=require`
 
