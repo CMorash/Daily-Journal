@@ -68,6 +68,18 @@
         </footer>
     </div>
 
+    <!-- Confirmation Modal -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal">
+            <h2 class="modal-title">Submit Entry?</h2>
+            <p class="modal-preview" id="entryPreview"></p>
+            <div class="modal-buttons">
+                <button type="button" class="modal-btn modal-btn-cancel" id="modalCancel">Go Back</button>
+                <button type="button" class="modal-btn modal-btn-confirm" id="modalConfirm">Submit</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Character counter
         const textarea = document.getElementById('text');
@@ -75,6 +87,58 @@
         
         textarea.addEventListener('input', function() {
             charCount.textContent = this.value.length;
+        });
+
+        // Confirmation modal logic
+        const form = document.querySelector('.entry-form');
+        const modal = document.getElementById('confirmModal');
+        const entryPreview = document.getElementById('entryPreview');
+        const modalConfirm = document.getElementById('modalConfirm');
+        const modalCancel = document.getElementById('modalCancel');
+        let pendingSubmit = false;
+
+        form.addEventListener('submit', function(e) {
+            if (!pendingSubmit) {
+                e.preventDefault();
+                
+                // Show preview of entry text
+                const entryText = textarea.value.trim();
+                if (entryText.length > 100) {
+                    entryPreview.textContent = '"' + entryText.substring(0, 100) + '..."';
+                } else {
+                    entryPreview.textContent = '"' + entryText + '"';
+                }
+                
+                modal.classList.add('active');
+                modalConfirm.focus();
+            }
+        });
+
+        modalConfirm.addEventListener('click', function() {
+            pendingSubmit = true;
+            modal.classList.remove('active');
+            form.submit();
+        });
+
+        modalCancel.addEventListener('click', function() {
+            modal.classList.remove('active');
+            textarea.focus();
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && modal.classList.contains('active')) {
+                modal.classList.remove('active');
+                textarea.focus();
+            }
+        });
+
+        // Close modal when clicking overlay background
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+                textarea.focus();
+            }
         });
 
         // Clear form after successful submission
